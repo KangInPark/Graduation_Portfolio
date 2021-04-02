@@ -3,17 +3,18 @@ import torch
 class Model(torch.nn.Module):
     def __init__(self):
         self.gamma = 0.98
+        self.buffer = []
         super(Model, self).__init__()
         self.linear1 = torch.nn.Linear(4, 128)
         self.pi = torch.nn.Linear(128, 2)
         self.val = torch.nn.Linear(128, 1)      
-        self.optimizer = torch.optim.Adam(self.parameters(), lr = 0.0001)
+        self.optimizer = torch.optim.Adam(self.parameters(), lr = 0.001)
 
-    def pi_forward(self, x):
+    def pi_forward(self, x, softdim = 0):
         x = self.linear1(x)
         x = torch.nn.functional.relu(x)
         pi = self.pi(x)
-        pi = torch.nn.functional.softmax(pi, dim=0)
+        pi = torch.nn.functional.softmax(pi, dim=softdim)
         return pi
 
     def val_forward(self, x):
@@ -22,10 +23,30 @@ class Model(torch.nn.Module):
         val = self.val(x)
         return val
 
-    def train(self, loss):
+    def save(self, data):
+        self.buffer.append(data)
+
+    def train(self):
+        sl, al, rl, spl, dl = [], [], [], [], []
+        for item in self.buffer:
+            s, a, r, sp, d = item
+            sl.append(s)
+            al.append([a])
+            rl.append([r/100.0])
+            spl.append(sp)
+            dl.append([not(d)])
+        s, action, reward, s_prime, done = torch.FloatTensor(sl), torch.tensor(al), torch.FloatTensor(rl), torch.FloatTensor(spl), torch.FloatTensor(dl)
+        val = self.val_forward(s)
+        val_prime = self.val_forward(s_prime)
+        td = reward + self.gamma * val_prime * done
+        delta =  td - val
+        pi = self.pi_forward(s, softdim=1)
+        pi_a = pi.gather(1,action)
+        loss = -torch.log(pi_a)*delta.detach()  + torch.nn.functional.smooth_l1_loss(td.detach(), val)
         self.optimizer.zero_grad()
-        loss.backward()
+        loss.mean().backward()
         self.optimizer.step()
+        self.buffer = []
 
 def RL(n_epi): 
     """
@@ -53,23 +74,23 @@ def RL(n_epi):
 
     sc = 0.0
     interval = 50
+    epoch = 10
+
     for n in range(n_epi):
         s = env.reset()
         done = False
         while not done:
-            pi = PG.pi_forward(torch.FloatTensor(s))
-            A = torch.distributions.Categorical(pi)
-            action = A.sample()
-            s_prime, reward, done, tmp = env.step(action.item())
-            val = PG.val_forward(torch.FloatTensor(s))
-            val_prime = PG.val_forward(torch.FloatTensor(s_prime))
-            td = reward + PG.gamma * val_prime
-            delta =  td - val
-            loss = -torch.log(pi[action])*delta  + torch.nn.functional.smooth_l1_loss(td, val)
-            PG.train(loss)
-            s = s_prime
-            sc += 1
-
+            for step in range(epoch):
+                pi = PG.pi_forward(torch.FloatTensor(s))
+                A = torch.distributions.Categorical(pi)
+                action = A.sample().item()
+                s_prime, reward, done, tmp = env.step(action)
+                PG.save((s,action,reward,s_prime,done))
+                s = s_prime
+                sc += reward
+                if done:
+                    break
+            PG.train()
         if n%interval ==0 and n!=0:
             print("{} : score:{}".format(n,sc/interval))
             sc = 0.0
