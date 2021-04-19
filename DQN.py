@@ -2,6 +2,22 @@ import gym
 import torch
 import random
 import collections
+from matplotlib import animation
+import matplotlib.pyplot as plt
+import os
+
+def save_frames(frames, path='./', filename='dqn.mp4'):
+
+    plt.figure(figsize=(frames[0].shape[1] / 72.0, frames[0].shape[0] / 72.0), dpi=72)
+
+    patch = plt.imshow(frames[0])
+    plt.axis('off')
+
+    def animate(i):
+        patch.set_data(frames[i])
+
+    anim = animation.FuncAnimation(plt.gcf(), animate, frames = len(frames), interval=50)
+    anim.save(path + filename, fps=60)
 
 class Experience_replay():
     def __init__(self):
@@ -17,13 +33,13 @@ class Experience_replay():
     def sample(self,n):
         return random.sample(self.dq, min(len(self.dq),n))
 
-class Model(torch.nn.Module):
-    def __init__(self):
+class DQN(torch.nn.Module):
+    def __init__(self, n_input, n_output):
         self.gamma = 0.98
-        super(Model, self).__init__()
-        self.linear1 = torch.nn.Linear(4, 128)
-        self.linear2 = torch.nn.Linear(128, 128)
-        self.linear3 = torch.nn.Linear(128, 2)     
+        super(DQN, self).__init__()
+        self.linear1 = torch.nn.Linear(n_input, 256)
+        self.linear2 = torch.nn.Linear(256, 256)
+        self.linear3 = torch.nn.Linear(256, n_output)     
 
     def forward(self, x):
         x = self.linear1(x)
@@ -64,14 +80,13 @@ def train(DQN, target, buffer, optimizer):
         optimizer.step()
     
 
-def RL(n_epi): 
+def RL(share, n_epi, game, n_input, n_output, n_play): 
     """
     PG = 0 : reinforce
     PG = 1 : Q actor-critic with TD(0)
     PG = 2 : Advantage actor-critic with TD
     """
-    env = gym.make('CartPole-v1')
-    
+    env = gym.make(game)
     """
     Observation:
         Type: Box(4)
@@ -86,33 +101,47 @@ def RL(n_epi):
         0     Push cart to the left
         1     Push cart to the right
     """
-    DQN = Model()
-    target = Model()
-    target.load_state_dict(DQN.state_dict())
+    dqn = DQN(n_input, n_output)
+    target = DQN(n_input, n_output)
+    target.load_state_dict(dqn.state_dict())
     buffer = Experience_replay()
-    optimizer = torch.optim.Adam(DQN.parameters(), lr = 0.001)
-
-    sc = 0.0
-    interval = 50
+    optimizer = torch.optim.Adam(dqn.parameters(), lr = 0.001)
+    interval = n_play
+    sc = 0.0    
+    frame = []
 
     for n in range(n_epi):
         epsilon = max(0.01, 0.1 - 0.01 * n/100)
         s = env.reset()
         done = False
         while not done:
-            action = DQN.action(torch.FloatTensor(s), epsilon)
+            if n%n_play ==0:
+                frame.append(env.render(mode="rgb_array"))
+            action = dqn.action(torch.FloatTensor(s), epsilon)
             s_prime, reward, done, tmp = env.step(action)
             buffer.insert((s,action,reward,s_prime,not(done)))
             s = s_prime
-            sc += 1
+            sc += reward
             if done:
+                if n%n_play ==0:
+                    save_frames(frame)
+                    frame=[]
+                    if os.path.isfile(os.getcwd()+'\dqn.gif'):
+                        os.remove(os.getcwd() + '\dqn.gif')
+                    os.system("ffmpeg -i "+ os.getcwd() + "\dqn.mp4 " + os.getcwd() + "\dqn.gif")
+                    os.remove(os.getcwd() + '\dqn.mp4')
                 break
-        train(DQN, target, buffer, optimizer)
+        train(dqn, target, buffer, optimizer)
         if n%5 ==0 and n !=0:
-            target.load_state_dict(DQN.state_dict())
-        if n%interval ==0 and n!=0:
-            print("{} : score:{}".format(n,sc/interval))
-            sc = 0.0
+            target.load_state_dict(dqn.state_dict())
+        if n%interval ==0:
+            if n!=0:
+                print("{} : score:{}".format(n,sc/interval))
+                sc = 0.0
+            share['dqn'] = 1
+            while share['wait']:
+                continue
+            share['dqn'] = 0
     env.close()
         
 if __name__ == '__main__':

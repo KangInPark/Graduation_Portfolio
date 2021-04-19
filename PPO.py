@@ -1,16 +1,33 @@
 import gym
 import torch
-class Model(torch.nn.Module):
-    def __init__(self):
+from matplotlib import animation
+import matplotlib.pyplot as plt
+import os
+
+def save_frames(frames, path='./', filename='ppo.mp4'):
+
+    plt.figure(figsize=(frames[0].shape[1] / 72.0, frames[0].shape[0] / 72.0), dpi=72)
+
+    patch = plt.imshow(frames[0])
+    plt.axis('off')
+
+    def animate(i):
+        patch.set_data(frames[i])
+
+    anim = animation.FuncAnimation(plt.gcf(), animate, frames = len(frames), interval=50)
+    anim.save(path + filename, fps=60)
+
+class PPO(torch.nn.Module):
+    def __init__(self,n_input, n_output):
         self.gamma = 0.98
         self.lamb = 0.95
         self.epsilon = 0.1
         self.K = 3
         self.buffer = []
-        super(Model, self).__init__()
-        self.linear1 = torch.nn.Linear(4, 128)
-        self.pi = torch.nn.Linear(128, 2)
-        self.val = torch.nn.Linear(128, 1)      
+        super(PPO, self).__init__()
+        self.linear1 = torch.nn.Linear(n_input, 256)
+        self.pi = torch.nn.Linear(256, n_output)
+        self.val = torch.nn.Linear(256, 1)      
         self.optimizer = torch.optim.Adam(self.parameters(), lr = 0.001)
 
     def pi_forward(self, x, softmax_dim = 0):
@@ -66,13 +83,13 @@ class Model(torch.nn.Module):
             loss.mean().backward()
             self.optimizer.step()
 
-def RL(n_epi): 
+def RL(share, n_epi, game, n_input, n_output, n_play): 
     """
     PG = 0 : reinforce
     PG = 1 : Q actor-critic with TD(0)
     PG = 2 : Advantage actor-critic with TD
     """
-    env = gym.make('CartPole-v1')
+    env = gym.make(game)
     
     """
     Observation:
@@ -88,30 +105,45 @@ def RL(n_epi):
         0     Push cart to the left
         1     Push cart to the right
     """
-    PPO = Model()
+    ppo = PPO(n_input, n_output)
     T = 20
     sc = 0.0
-    interval = 50
+    interval = n_play
+    frame = []
 
     for n in range(n_epi):
         s = env.reset()
         done = False
         while not done:
+            if n%n_play==0:
+                frame.append(env.render(mode="rgb_array"))
             for step in range(T):
-                pi = PPO.pi_forward(torch.FloatTensor(s))
+                pi = ppo.pi_forward(torch.FloatTensor(s))
                 A = torch.distributions.Categorical(pi)
                 action = A.sample().item()
                 s_prime, reward, done, tmp = env.step(action)
-                PPO.save((s,action,reward,s_prime,pi[action].item(),done))
+                ppo.save((s,action,reward,s_prime,pi[action].item(),done))
                 s = s_prime
-                sc += 1
+                sc += reward
                 if done:
+                    if n%n_play ==0:
+                        save_frames(frame)
+                        frame=[]
+                        if os.path.isfile(os.getcwd()+'\ppo.gif'):
+                            os.remove(os.getcwd() + '\ppo.gif')
+                        os.system("ffmpeg -i "+ os.getcwd() + "\ppo.mp4 " + os.getcwd() + "\ppo.gif")
+                        os.remove(os.getcwd() + '\ppo.mp4')
                     break
-            PPO.train()
+            ppo.train()
 
-        if n%interval ==0 and n!=0:
-            print("{} : score:{}".format(n,sc/interval))
-            sc = 0.0
+        if n%interval ==0:
+            if n!=0:
+                print("{} : score:{}".format(n,sc/interval))
+                sc = 0.0
+            share['ppo'] = 1
+            while share['wait']:
+                continue
+            share['ppo'] = 0
     env.close()
         
 if __name__ == '__main__':
