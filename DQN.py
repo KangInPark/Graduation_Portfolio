@@ -5,6 +5,7 @@ import collections
 from matplotlib import animation
 import matplotlib.pyplot as plt
 import os
+from moviepy.editor import *
 
 def save_frames(frames, path='./', filename='dqn.mp4'):
 
@@ -128,7 +129,7 @@ def RL(share, n_epi, game, n_input, n_output, n_play):
                     frame=[]
                     if os.path.isfile(os.getcwd()+'\dqn.gif'):
                         os.remove(os.getcwd() + '\dqn.gif')
-                    os.system("ffmpeg -i "+ os.getcwd() + "\dqn.mp4 " + os.getcwd() + "\dqn.gif")
+                    VideoFileClip('dqn.mp4').write_gif('dqn.gif')
                     os.remove(os.getcwd() + '\dqn.mp4')
                 break
         train(dqn, target, buffer, optimizer)

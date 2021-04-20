@@ -3,6 +3,7 @@ import torch
 from matplotlib import animation
 import matplotlib.pyplot as plt
 import os
+from moviepy.editor import *
 
 def save_frames(frames, path='./', filename='pgre.mp4'):
 
@@ -92,7 +93,7 @@ def RL(share, n_epi, game, n_input, n_output, n_play):
             frame=[]
             if os.path.isfile(os.getcwd()+'\pgre.gif'):
                 os.remove(os.getcwd() + '\pgre.gif')
-            os.system("ffmpeg -i "+ os.getcwd() + "\pgre.mp4 " + os.getcwd() + "\pgre.gif")
+            VideoFileClip('pgre.mp4').write_gif('pgre.gif')
             os.remove(os.getcwd() + '\pgre.mp4')
         PG.train()
         
