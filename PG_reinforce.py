@@ -88,18 +88,19 @@ def RL(share, n_epi, game, n_input, n_output, n_play):
             ob, reward, done, tmp = env.step(action)
             PG.save((reward, pi[action]))
             sc += reward
+        
         if n%n_play ==0:
             save_frames(frame)
             frame=[]
-            if os.path.isfile(os.getcwd()+'\pgre.gif'):
-                os.remove(os.getcwd() + '\pgre.gif')
-            VideoFileClip('pgre.mp4').write_gif('pgre.gif')
+            tmp = str(int(n/n_play))
+            VideoFileClip('pgre.mp4').write_gif(os.getcwd()+'\data\pgre' + tmp + '.gif', loop = 1)
             os.remove(os.getcwd() + '\pgre.mp4')
         PG.train()
         
         if n%interval ==0:
             if n!=0:
                 print("{} : score:{}".format(n,sc/interval))
+                share['r1'] = sc/interval
                 sc = 0.0
             share['pgre'] = 1
             while share['wait']:

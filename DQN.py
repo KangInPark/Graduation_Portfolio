@@ -127,9 +127,8 @@ def RL(share, n_epi, game, n_input, n_output, n_play):
                 if n%n_play ==0:
                     save_frames(frame)
                     frame=[]
-                    if os.path.isfile(os.getcwd()+'\dqn.gif'):
-                        os.remove(os.getcwd() + '\dqn.gif')
-                    VideoFileClip('dqn.mp4').write_gif('dqn.gif')
+                    tmp = str(int(n/n_play))      
+                    VideoFileClip('dqn.mp4').write_gif(os.getcwd()+'\data\dqn'+ tmp + '.gif', loop = 1)
                     os.remove(os.getcwd() + '\dqn.mp4')
                 break
         train(dqn, target, buffer, optimizer)
@@ -138,6 +137,7 @@ def RL(share, n_epi, game, n_input, n_output, n_play):
         if n%interval ==0:
             if n!=0:
                 print("{} : score:{}".format(n,sc/interval))
+                share['r3'] = sc/interval
                 sc = 0.0
             share['dqn'] = 1
             while share['wait']:

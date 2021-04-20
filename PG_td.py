@@ -98,9 +98,9 @@ def RL(share, n_epi, game, n_input, n_output, n_play):
         s = env.reset()
         done = False
         while not done:
-            if n%n_play == 0:
-                frame.append(env.render(mode="rgb_array"))
             for step in range(epoch):
+                if n%n_play == 0:
+                    frame.append(env.render(mode="rgb_array"))
                 pi = PG.pi_forward(torch.FloatTensor(s))
                 A = torch.distributions.Categorical(pi)
                 action = A.sample().item()
@@ -112,15 +112,15 @@ def RL(share, n_epi, game, n_input, n_output, n_play):
                     if n%n_play ==0:
                         save_frames(frame)
                         frame=[]
-                        if os.path.isfile(os.getcwd()+'\pgtd.gif'):
-                            os.remove(os.getcwd() + '\pgtd.gif')
-                        VideoFileClip('pgtd.mp4').write_gif('pgtd.gif')
+                        tmp = str(int(n/n_play)) 
+                        VideoFileClip('pgtd.mp4').write_gif(os.getcwd()+'\data\pgtd'+ tmp + '.gif', loop = 1)
                         os.remove(os.getcwd() + '\pgtd.mp4')
                     break
             PG.train()
         if n%interval ==0:
             if n!=0:
                 print("{} : score:{}".format(n,sc/interval))
+                share['r2'] = sc/interval
                 sc = 0.0
             share['pgtd'] = 1
             while share['wait']:
