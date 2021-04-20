@@ -1,14 +1,29 @@
+from PyQt5 import *
+from PyQt5.QtGui import *
+from PyQt5.QtWidgets import *
+from PyQt5.QtCore import *
+from PyQt5 import uic
+import sys
+import signal
+import multiprocessing
 import DQN
 import PG_reinforce
 import PG_td
 import PPO
-import multiprocessing
-import tkinter.ttk as ttk
-import tkinter.messagebox as msgbox
-from tkinter import *
-from PIL import Image
+import os
 
 if __name__ == '__main__':
+        
+    main_class = uic.loadUiType("main.ui")[0]
+    setting1_class = uic.loadUiType("setting1.ui")[0]
+    game = 'CartPole-v1'
+    n_epi = 10000
+    n_play = 100
+    schk = 0
+    d = {}
+    d['CartPole-v1'] = (4,2)
+    d['MountainCar-v0'] = (2,3)
+    d['Acrobot-v1'] = (6,3)
     manager = multiprocessing.Manager()
     share = manager.dict()
     share['wait'] = 1
@@ -16,182 +31,129 @@ if __name__ == '__main__':
     share['pgtd'] = 0
     share['dqn'] = 0
     share['ppo'] = 0
-    game = 'CartPole-v1'
-    n_epi = 10000
-    n_input = 4
-    n_output = 2
-    n_play = 300
-    schk = 0
-    d = {}
-    d['CartPole-v1'] = (4,2)
-    d['MountainCar-v0'] = (2,3)
-    d['Acrobot-v1'] = (6,3)
+    share['r1'] = 0.0
+    share['r2'] = 0.0
+    share['r3'] = 0.0
+    share['r4'] = 0.0
+    n_iter = 0
 
-    def epirl():
-        global schk
-        if schk == 0:
-            btn_epoch.configure(state=DISABLED)
-            n_input, n_output = d[game]
-            process1 = multiprocessing.Process(target=PG_reinforce.RL, args=(share, n_epi, game, n_input, n_output, n_play,))
-            process2 = multiprocessing.Process(target=PG_td.RL, args=(share, n_epi, game, n_input, n_output, n_play,))
-            process3 = multiprocessing.Process(target=DQN.RL, args=(share, n_epi, game, n_input, n_output, n_play,))
-            process4 = multiprocessing.Process(target=PPO.RL, args=(share, n_epi, game, n_input, n_output, n_play,))
-            process1.start()
-            process2.start()
-            process3.start()
-            process4.start()
-            schk = 1
-            while not share['pgre']:
-                continue
-            while not share['pgtd']:
-                continue
-            while not share['dqn']:
-                continue
-            while not share['ppo']:
-                continue
-            btn_epoch.configure(text='학습 진행')
-            btn_epoch.configure(state=NORMAL)
-
-        else:
-            btn_epoch.configure(state=DISABLED)
-            btn_ani.configure(state=DISABLED)
-
-            share['wait'] = 0
-            while share['pgre']:
-                continue
-            while share['pgtd']:
-                continue
-            while share['dqn']:
-                continue
-            while share['ppo']:
-                continue
-            share['wait'] = 1
-            
-            while not share['pgre']:
-                continue
-            while not share['pgtd']:
-                continue
-            while not share['dqn']:
-                continue
-            while not share['ppo']:
-                continue
-
-            btn_epoch.configure(state=NORMAL)
-            btn_ani.configure(state=NORMAL)
-    
-    def playani():
-        btn_ani.configure(state=DISABLED)
-        file1 = 'pgre.gif'
-        file2 = 'pgtd.gif'
-        file3 = 'dqn.gif'
-        file4 = 'ppo.gif'
-        info1 = Image.open(file1)
-        frames1 = info1.n_frames
-        im1 = [PhotoImage(file=file1, format= 'gif -index %i' %(i)) for i in range(frames1)]
-        info2 = Image.open(file2)
-        frames2 = info2.n_frames
-        im2 = [PhotoImage(file=file2, format= 'gif -index %i' %(i)) for i in range(frames2)]
-        info3 = Image.open(file3)
-        frames3 = info3.n_frames
-        im3 = [PhotoImage(file=file3, format= 'gif -index %i' %(i)) for i in range(frames3)]
-        info4 = Image.open(file4)
-        frames4 = info4.n_frames
-        im4 = [PhotoImage(file=file4, format= 'gif -index %i' %(i)) for i in range(frames4)]
-        maxframes = max(frames1, frames2, frames3, frames4)
-        cnt = 0
-        def gifani(cnt):
-            i1 = im1[min(frames1-1,cnt)]
-            i2 = im2[min(frames2-1,cnt)]
-            i3 = im3[min(frames3-1,cnt)]
-            i4 = im4[min(frames4-1,cnt)]
-            gif_label1.configure(image=i1)
-            gif_label2.configure(image=i2)
-            gif_label3.configure(image=i3)
-            gif_label4.configure(image=i4)
-            cnt+=1
-            if cnt == maxframes:
-                btn_ani.configure(state=NORMAL)
-                return
+    class setting1(QDialog, setting1_class):
+        def __init__(self):
+            super().__init__()
+            self.setupUi(self)
+            self.setWindowModality(Qt.ApplicationModal)
+            if game == 'CartPole-v1':
+                self.rbtn1.setChecked(True)
+            elif game == 'MountainCar-v0':
+                self.rbtn2.setChecked(True)
             else:
-                root.after(20, gifani ,cnt)
-        gifani(cnt)
+                self.rbtn3.setChecked(True)
+            self.line1.setText(str(n_epi))
+            self.line2.setText(str(n_play))
+            self.btn.clicked.connect(self.savedata)
 
-    def setting():
-        new = Toplevel(root)
-        new.wm_attributes("-topmost", 1)
-        l1 = Label(new, text="학습할 게임")
-        l1.pack()
-        game_var = StringVar()
-        gamebtn1 = Radiobutton(new, text='CartPole', value='CartPole-v1', variable=game_var)
-        gamebtn1.select()
-        gamebtn2 = Radiobutton(new, text='MountainCar', value='MountainCar-v0', variable=game_var)
-        gamebtn3 = Radiobutton(new, text='Acrobot', value='Acrobot-v1', variable=game_var)
-        gamebtn1.pack()
-        gamebtn2.pack()
-        gamebtn3.pack()
-
-        l2 = Label(new, text="총 에피소드 횟수")
-        l2.pack()
-        nepi = Entry(new, width = 10)
-        nepi.insert(0, str(n_epi))
-        nepi.pack()
-        l3 = Label(new, text="Visualization Update 단위 (설정 값 만큼의 에피소드를 진행한 후 Visualization 제공)")
-        l3.pack()
-        nplay = Entry(new, width = 10)
-        nplay.insert(0, str(n_play))
-        nplay.pack()
-
-        def get_var():
+        def savedata(self):
             global game
             global n_epi
             global n_play
-            game = game_var.get()
-            n_epi = int(nepi.get())
-            n_play = int(nplay.get())
-            msgbox.showinfo("알림", "정상적으로 설정이 완료되었습니다.")
-            new.destroy()
+            
+            if self.rbtn1.isChecked():
+                game = 'CartPole-v1'
+            elif self.rbtn2.isChecked():
+                game = 'MountainCar-v0'
+            else:
+                game = 'Acrobot-v1'
+            n_epi = int(self.line1.text())
+            n_play = int(self.line2.text())
+            self.close()
 
-        btn_get = Button(new, padx=3, pady=3, text="설정", command=get_var)
-        btn_get.pack()
+    class window(QMainWindow, main_class):
+        def __init__(self):
+            super().__init__()
+            self.setupUi(self)
+            self.setup.triggered.connect(self.menu_set1)
+            self.end.triggered.connect(QApplication.quit)
+            self.btn1.clicked.connect(self.epi_rl)
+            self.btn2.clicked.connect(self.load_gif)
 
-    root = Tk()
-    root.wm_attributes("-topmost", 1)
-    root.title("")
-    screen_width = root.winfo_screenwidth()
-    screen_height = root.winfo_screenheight()
-    x = int(screen_width/2)-320
-    y = int(screen_height/2)-240
-    position = "+" + str(x) + "+" + str(y)
-    #root.geometry("640x480" + position)
-    #root.resizable(False, False)
+        def epi_rl(self):
+            global schk
+            global n_iter
+            if schk == 0:
+                self.setup.setEnabled(False)
+                self.para.setEnabled(False)
+                self.btn1.setEnabled(False)
+                n_input, n_output = d[game]
+                process1 = multiprocessing.Process(target=PG_reinforce.RL, args=(share, n_epi, game, n_input, n_output, n_play,))
+                process2 = multiprocessing.Process(target=PG_td.RL, args=(share, n_epi, game, n_input, n_output, n_play,))
+                process3 = multiprocessing.Process(target=DQN.RL, args=(share, n_epi, game, n_input, n_output, n_play,))
+                process4 = multiprocessing.Process(target=PPO.RL, args=(share, n_epi, game, n_input, n_output, n_play,))
+                process1.start()
+                process2.start()
+                process3.start()
+                process4.start()
+                schk = 1
+                while not share['pgre']:
+                    continue
+                while not share['pgtd']:
+                    continue
+                while not share['dqn']:
+                    continue
+                while not share['ppo']:
+                    continue
+                self.btn1.setText('학습진행')
+                self.btn1.setEnabled(True)
 
-    menu = Menu(root)
-    menu_menu = Menu(menu, tearoff=0)
-    menu_menu.add_command(label="학습 설정",command=setting)
-    menu_menu.add_command(label="종료", command=root.quit)
-    menu.add_cascade(label="메뉴", menu=menu_menu)
-    root.config(menu=menu)
-    label1 = Label(root, text="PG_reinforce")
-    label1.grid(row=0, column=0)
-    gif_label1 = Label(root, image="")
-    gif_label1.grid(row=1,column=0)
-    label2 = Label(root, text="PG_td")
-    label2.grid(row=0, column=1)
-    gif_label2 = Label(root, image="")
-    gif_label2.grid(row=1,column=1)
-    label3 = Label(root, text="DQN")
-    label3.grid(row=2, column=0)
-    gif_label3 = Label(root, image="")
-    gif_label3.grid(row=3,column=0)
-    label4 = Label(root, text="PPO")
-    label4.grid(row=2, column=1)
-    gif_label4 = Label(root, image="")
-    gif_label4.grid(row=3,column=1)
+            else:
+                n_iter += 1
+                self.iter.setText(str(n_iter))
+                self.btn1.setEnabled(False)
+                self.btn2.setEnabled(False)
+                share['wait'] = 0
+                while share['pgre']:
+                    continue
+                while share['pgtd']:
+                    continue
+                while share['dqn']:
+                    continue
+                while share['ppo']:
+                    continue
+                share['wait'] = 1
+                
+                while not share['pgre']:
+                    continue
+                while not share['pgtd']:
+                    continue
+                while not share['dqn']:
+                    continue
+                while not share['ppo']:
+                    continue
+                self.r1.setText(str(share['r1']))
+                self.r2.setText(str(share['r2']))
+                self.r3.setText(str(share['r3']))
+                self.r4.setText(str(share['r4']))
+                self.btn1.setEnabled(True)
+                self.btn2.setEnabled(True)
 
-    btn_epoch = Button(root, padx=3, pady=3, text="학습 준비", command=epirl)
-    btn_epoch.grid(row=4,column=0, sticky=N+E+W+S)
-    btn_ani = Button(root, padx=3, pady=3, text="Visualization", command=playani, state=DISABLED)
-    btn_ani.grid(row=4,column=1, sticky=N+E+W+S)
+        def menu_set1(self):
+            self.new = setting1()
+            self.new.show()
 
-    root.mainloop()
-    
+        def load_gif(self):
+            self.data1 = QMovie(os.getcwd() + '\data\pgre'+str(n_iter)+'.gif')
+            self.data2 = QMovie(os.getcwd() + '\data\pgtd'+str(n_iter)+'.gif')
+            self.data3 = QMovie(os.getcwd() + '\data\dqn'+str(n_iter)+'.gif')
+            self.data4 = QMovie(os.getcwd() + '\data\ppo'+str(n_iter)+'.gif')
+            self.gif1.setMovie(self.data1)
+            self.gif2.setMovie(self.data2)
+            self.gif3.setMovie(self.data3)
+            self.gif4.setMovie(self.data4)
+            self.data1.start()
+            self.data2.start()
+            self.data3.start()
+            self.data4.start()
+
+    app = QApplication(sys.argv)
+    mwindow = window()
+    mwindow.show()
+    sys.exit(app.exec_())
