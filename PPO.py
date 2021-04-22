@@ -5,6 +5,11 @@ import matplotlib.pyplot as plt
 import os
 from moviepy.editor import *
 
+gamma = 0.98
+lr = 0.001
+lamb = 0.95
+epsilon = 0.1
+
 def save_frames(frames, path='./', filename='ppo.mp4'):
 
     plt.figure(figsize=(frames[0].shape[1] / 72.0, frames[0].shape[0] / 72.0), dpi=72)
@@ -20,16 +25,13 @@ def save_frames(frames, path='./', filename='ppo.mp4'):
 
 class PPO(torch.nn.Module):
     def __init__(self,n_input, n_output):
-        self.gamma = 0.98
-        self.lamb = 0.95
-        self.epsilon = 0.1
         self.K = 3
         self.buffer = []
         super(PPO, self).__init__()
         self.linear1 = torch.nn.Linear(n_input, 256)
         self.pi = torch.nn.Linear(256, n_output)
         self.val = torch.nn.Linear(256, 1)      
-        self.optimizer = torch.optim.Adam(self.parameters(), lr = 0.001)
+        self.optimizer = torch.optim.Adam(self.parameters(), lr = lr)
 
     def pi_forward(self, x, softmax_dim = 0):
         x = self.linear1(x)
@@ -63,14 +65,14 @@ class PPO(torch.nn.Module):
         self.buffer = []
 
         for epoch in range(self.K):
-            td = reward + self.gamma * self.val_forward(s_prime) * done
+            td = reward + gamma * self.val_forward(s_prime) * done
             delta = td - self.val_forward(s)
             delta = delta.detach().numpy()
 
             Al = []
             A = 0.0
             for value in delta[::-1]:
-                A = value[0] + self.gamma * self.lamb * A
+                A = value[0] + gamma * lamb * A
                 Al.append([A])
             Al.reverse()
             A = torch.FloatTensor(Al)
@@ -79,39 +81,24 @@ class PPO(torch.nn.Module):
             pi_a = pi.gather(1,action)
             r = torch.exp(torch.log(pi_a) - torch.log(prob_a))
 
-            loss = -torch.min(r*A, torch.clamp(r,1-self.epsilon,1+self.epsilon)*A) + torch.nn.functional.smooth_l1_loss(td.detach(), self.val_forward(s))
+            loss = -torch.min(r*A, torch.clamp(r,1-epsilon,1+epsilon)*A) + torch.nn.functional.smooth_l1_loss(td.detach(), self.val_forward(s))
             self.optimizer.zero_grad()
             loss.mean().backward()
             self.optimizer.step()
 
-def RL(share, n_epi, game, n_input, n_output, n_play): 
-    """
-    PG = 0 : reinforce
-    PG = 1 : Q actor-critic with TD(0)
-    PG = 2 : Advantage actor-critic with TD
-    """
+def RL(share, n_epi, game, n_input, n_output, n_play, hyper):
+    global gamma
+    global lr
+    global lamb
+    global epsilon
+    gamma, lr, lamb, epsilon = hyper
     env = gym.make(game)
     
-    """
-    Observation:
-        Type: Box(4)
-        Num     Observation               Min                     Max
-        0       Cart Position             -4.8                    4.8
-        1       Cart Velocity             -Inf                    Inf
-        2       Pole Angle                -0.418 rad (-24 deg)    0.418 rad (24 deg)
-        3       Pole Angular Velocity     -Inf                    Inf
-    Actions:
-        Type: Discrete(2)
-        Num   Action
-        0     Push cart to the left
-        1     Push cart to the right
-    """
     ppo = PPO(n_input, n_output)
     T = 20
     sc = 0.0
     interval = n_play
     frame = []
-
     for n in range(n_epi):
         s = env.reset()
         done = False
@@ -146,7 +133,3 @@ def RL(share, n_epi, game, n_input, n_output, n_play):
                 continue
             share['ppo'] = 0
     env.close()
-        
-if __name__ == '__main__':
-    n_epi = input("n_epi?")
-    RL(int(n_epi))

@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import os
 from moviepy.editor import *
 
+gamma = 0.98
+lr = 0.001
 def save_frames(frames, path='./', filename='pgtd.mp4'):
 
     plt.figure(figsize=(frames[0].shape[1] / 72.0, frames[0].shape[0] / 72.0), dpi=72)
@@ -20,13 +22,12 @@ def save_frames(frames, path='./', filename='pgtd.mp4'):
 
 class PGTD(torch.nn.Module):
     def __init__(self, n_input, n_output):
-        self.gamma = 0.98
         self.buffer = []
         super(PGTD, self).__init__()
         self.linear1 = torch.nn.Linear(n_input, 256)
         self.pi = torch.nn.Linear(256, n_output)
         self.val = torch.nn.Linear(256, 1)      
-        self.optimizer = torch.optim.Adam(self.parameters(), lr = 0.001)
+        self.optimizer = torch.optim.Adam(self.parameters(), lr = lr)
 
     def pi_forward(self, x, softdim = 0):
         x = self.linear1(x)
@@ -56,7 +57,7 @@ class PGTD(torch.nn.Module):
         s, action, reward, s_prime, done = torch.FloatTensor(sl), torch.tensor(al), torch.FloatTensor(rl), torch.FloatTensor(spl), torch.FloatTensor(dl)
         val = self.val_forward(s)
         val_prime = self.val_forward(s_prime)
-        td = reward + self.gamma * val_prime * done
+        td = reward + gamma * val_prime * done
         delta =  td - val
         pi = self.pi_forward(s, softdim=1)
         pi_a = pi.gather(1,action)
@@ -66,34 +67,16 @@ class PGTD(torch.nn.Module):
         self.optimizer.step()
         self.buffer = []
 
-def RL(share, n_epi, game, n_input, n_output, n_play): 
-    """
-    PG = 0 : reinforce
-    PG = 1 : Q actor-critic with TD(0)
-    PG = 2 : Advantage actor-critic with TD
-    """
+def RL(share, n_epi, game, n_input, n_output, n_play, hyper): 
+    global gamma
+    global lr
+    gamma, lr = hyper
     env = gym.make(game)
-    
-    """
-    Observation:
-        Type: Box(4)
-        Num     Observation               Min                     Max
-        0       Cart Position             -4.8                    4.8
-        1       Cart Velocity             -Inf                    Inf
-        2       Pole Angle                -0.418 rad (-24 deg)    0.418 rad (24 deg)
-        3       Pole Angular Velocity     -Inf                    Inf
-    Actions:
-        Type: Discrete(2)
-        Num   Action
-        0     Push cart to the left
-        1     Push cart to the right
-    """
     PG = PGTD(n_input, n_output)
     sc = 0.0
     epoch = 10
     interval = n_play
     frame = []
-
     for n in range(n_epi):
         s = env.reset()
         done = False
@@ -127,7 +110,3 @@ def RL(share, n_epi, game, n_input, n_output, n_play):
                 continue
             share['pgtd'] = 0
     env.close()
-        
-if __name__ == '__main__':
-    n_epi = input("n_epi")
-    RL(int(n_epi))
