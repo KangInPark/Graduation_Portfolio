@@ -40,6 +40,7 @@ if __name__ == '__main__':
     share['r2'] = 0.0
     share['r3'] = 0.0
     share['r4'] = 0.0
+    share['s'] = 1
     r1 = []
     r2 = []
     r3 = []
@@ -198,16 +199,21 @@ if __name__ == '__main__':
                     continue
                 while not share['ppo']:
                     continue
-                self.r1.setText(str(share['r1']))
-                self.r2.setText(str(share['r2']))
-                self.r3.setText(str(share['r3']))
-                self.r4.setText(str(share['r4']))
-                r1.append(share['r1'])
-                r2.append(share['r2'])
-                r3.append(share['r3'])
-                r4.append(share['r4'])
-                self.btn1.setEnabled(True)
-                self.btn2.setEnabled(True)
+                if share['s'] == 1 or share['s'] == 2:
+                    self.r1.setText(str(share['r1']))
+                    self.r2.setText(str(share['r2']))
+                    self.r3.setText(str(share['r3']))
+                    self.r4.setText(str(share['r4']))
+                    r1.append(share['r1'])
+                    r2.append(share['r2'])
+                    r3.append(share['r3'])
+                    r4.append(share['r4'])
+                if share['s'] == 1:
+                    self.btn1.setEnabled(True)
+                    self.btn2.setEnabled(True)
+                else:
+                    self.btn1.setText('학습완료')
+                    self.btn2.setEnabled(True)
 
         def menu_set1(self):
             self.new1 = setting1()
