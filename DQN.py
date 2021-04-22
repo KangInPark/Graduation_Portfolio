@@ -101,7 +101,7 @@ def RL(share, n_epi, game, n_input, n_output, n_play, hyper):
     interval = n_play
     sc = 0.0    
     frame = []
-    for n in range(n_epi):
+    for n in range(n_epi+1):
         epsilon = max(epsilon_min, epsilon_max - epsilon_weight*n)
         s = env.reset()
         done = False
@@ -130,7 +130,13 @@ def RL(share, n_epi, game, n_input, n_output, n_play, hyper):
                 share['r3'] = sc/interval
                 sc = 0.0
             share['dqn'] = 1
-            while share['wait']:
+            while share['wait'] and n!= n_epi:
                 continue
             share['dqn'] = 0
+        if n == n_epi:
+            if n%interval ==0:
+                share['s'] = 2
+            else:
+                share['s'] = 0
+            share['dqn'] = 1
     env.close()

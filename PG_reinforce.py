@@ -59,7 +59,7 @@ def RL(share, n_epi, game, n_input, n_output, n_play, hyper):
     sc = 0.0
     frame = []
     gamma, lr = hyper
-    for n in range(n_epi):
+    for n in range(n_epi+1):
         ob = env.reset()
         done = False
         while not done:
@@ -87,7 +87,13 @@ def RL(share, n_epi, game, n_input, n_output, n_play, hyper):
                 share['r1'] = sc/interval
                 sc = 0.0
             share['pgre'] = 1
-            while share['wait']:
+            while share['wait'] and n!= n_epi:
                 continue
             share['pgre'] = 0
+        if n == n_epi:
+            if n%interval ==0:
+                share['s'] = 2
+            else:
+                share['s'] = 0
+            share['pgre'] = 1
     env.close()
