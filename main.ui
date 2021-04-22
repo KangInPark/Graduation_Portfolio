@@ -385,6 +385,8 @@
     <addaction name="setup"/>
     <addaction name="para"/>
     <addaction name="separator"/>
+    <addaction name="chart"/>
+    <addaction name="separator"/>
     <addaction name="end"/>
    </widget>
    <addaction name="menu"/>
@@ -402,6 +404,14 @@
   <action name="end">
    <property name="text">
     <string>종료</string>
+   </property>
+  </action>
+  <action name="chart">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>차트 생성</string>
    </property>
   </action>
  </widget>
