@@ -105,14 +105,21 @@ def RL(share, n_epi, game, n_input, n_output, n_play, hyper):
         epsilon = max(epsilon_min, epsilon_max - epsilon_weight*n)
         s = env.reset()
         done = False
+        epi_reward = 0
         while not done:
             if n%n_play ==0:
                 frame.append(env.render(mode="rgb_array"))
             action = dqn.action(torch.FloatTensor(s), epsilon)
             s_prime, reward, done, tmp = env.step(action)
+            sc += reward
+            epi_reward += reward
+            if game == 'MountainCar-v0':
+                if done:
+                    reward = 200 + epi_reward
+                else:
+                    reward = abs(s_prime[0] - s[0])
             buffer.insert((s,action,reward,s_prime,not(done)))
             s = s_prime
-            sc += reward
             if done:
                 if n%n_play ==0:
                     save_frames(frame)
@@ -128,6 +135,8 @@ def RL(share, n_epi, game, n_input, n_output, n_play, hyper):
             if n!=0:
                 print("{} : score:{}".format(n,sc/interval))
                 share['r3'] = sc/interval
+                sc = 0.0
+            else:
                 sc = 0.0
             share['dqn'] = 1
             while share['wait'] and n!= n_epi:

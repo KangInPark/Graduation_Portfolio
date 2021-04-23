@@ -60,18 +60,25 @@ def RL(share, n_epi, game, n_input, n_output, n_play, hyper):
     frame = []
     gamma, lr = hyper
     for n in range(n_epi+1):
-        ob = env.reset()
+        s = env.reset()
         done = False
+        epi_reward = 0
         while not done:
             if n%n_play == 0:
                 frame.append(env.render(mode="rgb_array"))
-            ob = torch.FloatTensor(ob)
-            pi = PG(ob)
+            pi = PG(torch.FloatTensor(s))
             A = torch.distributions.Categorical(pi)
             action = A.sample().item()
-            ob, reward, done, tmp = env.step(action)
-            PG.save((reward, pi[action]))
+            s_prime, reward, done, tmp = env.step(action)
             sc += reward
+            epi_reward += reward
+            if game == 'MountainCar-v0':
+                if done:
+                    reward = 200 + epi_reward
+                else:
+                    reward = abs(s_prime[0] - s[0])
+            PG.save((reward, pi[action]))
+            s = s_prime
         
         if n%n_play ==0:
             save_frames(frame)
@@ -85,6 +92,8 @@ def RL(share, n_epi, game, n_input, n_output, n_play, hyper):
             if n!=0:
                 print("{} : score:{}".format(n,sc/interval))
                 share['r1'] = sc/interval
+                sc = 0.0
+            else:
                 sc = 0.0
             share['pgre'] = 1
             while share['wait'] and n!= n_epi:

@@ -80,6 +80,7 @@ def RL(share, n_epi, game, n_input, n_output, n_play, hyper):
     for n in range(n_epi+1):
         s = env.reset()
         done = False
+        epi_reward = 0
         while not done:
             for step in range(epoch):
                 if n%n_play == 0:
@@ -88,9 +89,15 @@ def RL(share, n_epi, game, n_input, n_output, n_play, hyper):
                 A = torch.distributions.Categorical(pi)
                 action = A.sample().item()
                 s_prime, reward, done, tmp = env.step(action)
+                sc += reward
+                epi_reward += reward
+                if game == 'MountainCar-v0':
+                    if done:
+                        reward = 200 + epi_reward
+                    else:
+                        reward = abs(s_prime[0] - s[0])
                 PG.save((s,action,reward,s_prime,done))
                 s = s_prime
-                sc += reward
                 if done:
                     if n%n_play ==0:
                         save_frames(frame)
@@ -104,6 +111,8 @@ def RL(share, n_epi, game, n_input, n_output, n_play, hyper):
             if n!=0:
                 print("{} : score:{}".format(n,sc/interval))
                 share['r2'] = sc/interval
+                sc = 0.0
+            else:
                 sc = 0.0
             share['pgtd'] = 1
             while share['wait'] and n!= n_epi:
